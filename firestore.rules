@@ -1,0 +1,34 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── STEP 8 in README ─────────────────────────────────────────────
+    // Easiest: in the app, Settings → Firebase → Copy locked rules, and publish
+    // them in the Firebase console. Or paste your User ID (Settings → Account)
+    // between the quotes below and run:
+    //     firebase deploy --only firestore:rules
+    // From then on, no other Google/email account can read or write
+    // anything in this database, even if they sign up to your app.
+    function allowedUid() {
+      return "";
+    }
+
+    function isOwner(uid) {
+      return request.auth != null
+        && request.auth.uid == uid
+        && (allowedUid() == "" || uid == allowedUid());
+    }
+
+    // Each person can only ever touch their own folder: users/{their uid}/...
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /{document=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Everything else is denied by default.
+  }
+}

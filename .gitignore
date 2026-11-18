@@ -1,0 +1,8 @@
+.firebase/
+node_modules/
+*.log
+build/
+android/*.jks
+android/keystore.properties
+dist/*.apk
+dist/*.idsig

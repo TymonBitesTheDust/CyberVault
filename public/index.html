@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!--
+    Content Security Policy: only scripts from this site and Google's Firebase CDN may run.
+    www.google.com / recaptcha.google.com are for the reCAPTCHA check Firebase runs before
+    sending a text-message code.
+    If sign-in ever fails with a "Content Security Policy" error in the browser console,
+    add the blocked address to the matching line below.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://www.gstatic.com https://apis.google.com https://www.google.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://www.google.com;
+    frame-src https://*.firebaseapp.com https://*.web.app https://accounts.google.com https://apis.google.com https://www.google.com https://recaptcha.google.com;
+    worker-src 'self';
+    object-src 'none';
+    base-uri 'none';
+    form-action 'self'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#050807">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="CyberVault">
+  <meta name="format-detection" content="telephone=no">
+  <title>CyberVault</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/logo.svg">
+  <link rel="alternate icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div id="app"><div class="boot">Loading CyberVault…</div></div>
+  <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
