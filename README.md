@@ -5,6 +5,7 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 <p align="center"><b>Version 2.0.0</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
 
 <p align="center">
+  <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.exe"><b>⬇ Windows app (EXE)</b></a> &nbsp;·&nbsp;
   <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.apk"><b>⬇ Android app (APK)</b></a> &nbsp;·&nbsp;
   <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/cybervault.html"><b>⬇ Web app (one HTML file)</b></a> &nbsp;·&nbsp;
   <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest">All downloads</a>
@@ -23,17 +24,20 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 - **New item types:** bank card, bank account (BSB and account number), and **Wi-Fi with a QR code** guests can scan to join.
 - **Better dates.** Medicare and card dates (`MM/YYYY`, `MM/YY`) now get expiry warnings, and dates are checked as you type.
 - **Favourites, recently used and sort options** for the list.
+- **Windows app:** one `.exe`, no installer and no web hosting needed. Plus the Android app.
 - **About** section at the bottom of Settings.
 
 ## Download
 
 | You have… | Get |
 |---|---|
-| **An Android phone** | [**CyberVault.apk**](https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.apk): open the link on your phone and install it ([how](#android-app)) |
-| **An iPhone, or any computer** | The web app. Put it online once (free, [setup](#setup-about-15-minutes-free)), then **Add to Home Screen** |
+| **A Windows 10 or 11 PC** | [**CyberVault.exe**](https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.exe): download it and double-click. No installer ([more](#windows-app)) |
+| **An Android phone** | [**CyberVault.apk**](https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.apk): open the link on your phone and install it ([more](#android-app)) |
+| **A Mac, iPhone, Linux or Chromebook** | The web app. Put it online once (free, [setup](#setup-about-15-minutes-free)), then install it from the browser ([how](#other-computers-mac-linux-chromebook)) |
 
 Every option needs **your own free Firebase project**: that's where your encrypted vault lives, so nobody else
 (including me) holds your data. The [setup](#setup-about-15-minutes-free) takes about 15 minutes, and the app walks you through it.
+The Windows and Android apps skip the hosting step: just create the project, then paste its config into the app.
 
 All files are on the [Releases page](https://github.com/TymonBitesTheDust/CyberVault/releases/latest), with a `SHA256SUMS.txt` to check your download.
 
@@ -47,6 +51,7 @@ All files are on the [Releases page](https://github.com/TymonBitesTheDust/CyberV
 - **Recovery options.** A recovery key, plus optional security questions, can reset a forgotten master password.
 - **Connect Firebase inside the app**, with a built-in setup guide. Add other devices with a setup link.
 - **Moves logins to and from Google Password Manager** with a CSV file.
+- **Windows app (EXE):** one file, no installer, no web hosting needed.
 - **Android app (APK)** with screenshot blocking, a native clipboard that hides and clears passwords, and camera photos that never touch your gallery.
 - **Installs to your home screen** on iPhone and Android. Also comes as a single HTML file.
 - **Terminal-style dark theme** with the bundled JetBrains Mono font.
@@ -116,6 +121,8 @@ click **Register app**. No hosting setup is needed on that screen. Copy the `fir
 Lost it? It's always under **Project settings → Your apps → SDK setup and configuration → Config**.
 
 ### 6. Put the app online
+*Using only the [Windows](#windows-app) or [Android](#android-app) app? Skip this step: open the app and go to step 7.*
+
 With Firebase Hosting (needs [Node.js](https://nodejs.org)):
 ```bash
 npm install -g firebase-tools
@@ -309,9 +316,51 @@ Your account has two parts, deleted in different places:
 To remove everything at once, delete the whole Firebase project instead: **Project settings** → **General** →
 **Delete project**. Then delete any backup files you downloaded. To remove the copy saved on a device, use
 **Settings → Use a different Firebase project** on that device and remove the home-screen app (or uninstall the
-Android app).
+Android app, or delete `CyberVault.exe` and its `%LOCALAPPDATA%\CyberVault` folder).
 
 ---
+
+## Windows app
+
+[**CyberVault.exe**](https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.exe) runs on Windows 10 and 11 (64-bit). It's the same CyberVault in
+its own window, using Microsoft Edge WebView2, which is built into Windows. One file, no installer.
+
+**Start it**
+1. Download `CyberVault.exe` and double-click it. Keep it anywhere, e.g. your Desktop or Documents.
+2. CyberVault isn't code-signed yet, so Windows may say **"Windows protected your PC"**. Click **More info → Run anyway**.
+   (Want to check the file first? Compare it with `SHA256SUMS.txt`: in PowerShell, `Get-FileHash CyberVault.exe`.)
+3. On **Connect Firebase**, paste your Firebase config, or the setup code from **Settings → Firebase** on another device.
+   Then sign in with your email and password.
+
+Tip: right-click `CyberVault.exe` → **Pin to Start** or **Pin to taskbar**.
+
+**What to know**
+- Your Firebase connection, settings and the encrypted offline copy are kept in `%LOCALAPPDATA%\CyberVault`.
+  Like the website, the vault itself is in your Firebase project, and nothing is stored decrypted.
+- It works offline, and the Firebase SDK is inside the app, so it never downloads and runs code.
+- Websites (an item's link, the Firebase console…) open in your normal browser. Backups and exports go to your **Downloads** folder.
+- **No Google sign-in.** Google blocks it inside apps like this one. Use email and password. If your account only
+  uses Google, use CyberVault in your browser instead.
+- Opening it again just brings the open window to the front.
+- If the WebView2 Runtime is missing (rare, on older Windows 10), it offers Microsoft's free download, or opens CyberVault
+  in your browser in the meantime.
+- **Updating:** download the new `CyberVault.exe` and replace the old one. Your data stays.
+- To remove it, delete `CyberVault.exe` and the `%LOCALAPPDATA%\CyberVault` folder.
+
+**Build it yourself.** Needs [Go](https://go.dev/dl) 1.24+ and [Node.js](https://nodejs.org), on Windows, macOS or Linux:
+```bash
+tools/build-exe.sh          # → dist/CyberVault.exe
+```
+
+## Other computers (Mac, Linux, Chromebook)
+
+Use the web app, and install it from your browser so it gets its own window and icon, and opens offline:
+- **Chrome** (Mac, Windows, Linux, ChromeOS): open your CyberVault site → the **Install** icon at the right of the
+  address bar (or ⋮ → **Cast, save and share → Install page as app**).
+- **Edge** (Windows, Mac): open your CyberVault site → ⋯ → **Apps → Install this site as an app**.
+- **Safari on a Mac** (macOS Sonoma or newer): **File → Add to Dock**.
+
+It updates by itself whenever you update your site.
 
 ## Android app
 
@@ -400,9 +449,13 @@ dist/
   cybervault.html       the whole app as one HTML file
   sw.js                 optional: upload next to cybervault.html so it opens offline
   CyberVault.apk        the Android app (built by tools/build-apk.sh, not committed)
+  CyberVault.exe        the Windows app (built by tools/build-exe.sh, not committed)
 tools/build-single-file.mjs   rebuilds dist/cybervault.html and dist/sw.js from public/
 tools/build-apk.sh      builds the Android app from public/ + android/
+tools/build-exe.sh      builds the Windows app from public/ + desktop/
+tools/make-windows-resources.sh   remakes the Windows app's icon and file details
 android/                the Android shell: manifest, icons, MainActivity.java, CaptureProvider.java
+desktop/                the Windows shell: main_windows.go (window), server.go (serves the app on this PC only)
 firestore.rules         database security rules (publish them in the console, step 4)
 LICENSE                 MIT licence
 SECURITY.md             how to report a security problem

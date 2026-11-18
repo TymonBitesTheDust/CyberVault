@@ -12,8 +12,8 @@ I'll reply as soon as I can, and credit you in the fix if you'd like.
 
 ## What's in scope
 
-- The web app (`public/`), the single-file build (`dist/cybervault.html`, `dist/sw.js`)
-  and the Android app (`android/`, `tools/build-apk.sh`).
+- The web app (`public/`), the single-file build (`dist/cybervault.html`, `dist/sw.js`),
+  the Android app (`android/`, `tools/build-apk.sh`) and the Windows app (`desktop/`, `tools/build-exe.sh`).
 - The encryption in [`public/vault-crypto.js`](public/vault-crypto.js) and the
   Firestore rules in [`firestore.rules`](firestore.rules).
 
