@@ -2,7 +2,7 @@
 <h1 align="center">CyberVault</h1>
 <p align="center"><b>Your personal encrypted vault</b> for logins, ID numbers, cards and document photos.<br>
 Encrypted on your device, synced through your own Firebase project, and usable offline.</p>
-<p align="center"><b>Version 2.1.0</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
+<p align="center"><b>Version 2.1.1</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
 
 <p align="center">
   <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.exe"><b>⬇ Windows app (EXE)</b></a> &nbsp;·&nbsp;
@@ -15,6 +15,8 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 
 ## What's new
 
+**2.1.1:** saving, starring, deleting and restoring are instant again: changes no longer wait for the server.
+
 **2.1:** the **[Windows app](#windows-app)**. One `.exe` for Windows 10 and 11, with no installer and no web hosting needed.
 
 **2.0:**
@@ -22,7 +24,7 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 <p align="center"><img src="docs/whats-new.png" width="900" alt="Wi-Fi QR code, the 'changed on another device' choice, Sync and Backup settings, and the About section"></p>
 
 - **Works offline.** An encrypted copy stays on each device. Changes you make offline sync by themselves when you're back online.
-- **Live sync, with no silent overwrites.** Changes appear on your other devices straight away. If the same item is changed on two devices, CyberVault asks what to do, or keeps both.
+- **Live sync, with no silent overwrites.** Changes appear on your other devices straight away. If the same item is changed on two devices, both versions are kept.
 - **Full encrypted backup.** One file with every item and photo. Restore it into any vault.
 - **Recently deleted.** Deleted items can be restored for 30 days. Logins and Wi-Fi keep a **password history**.
 - **New item types:** bank card, bank account (BSB and account number), and **Wi-Fi with a QR code** guests can scan to join.
@@ -219,14 +221,13 @@ so on a phone it's best effort.
 
 ## Sync and offline
 
-- **Live sync:** changes on one device appear on your others within a second or two.
-- **Editing on two devices:** if an item changes elsewhere while you're editing it, a banner tells you. When you
-  save, you choose to **keep both**, **replace theirs with yours**, or **discard yours**. Nothing is overwritten
-  without asking.
+- **Instant saves:** saving never waits for the internet. Changes are kept on the device straight away and sent in the
+  background, so your other devices see them within a second or two.
+- **Editing on two devices:** if an item changes elsewhere while you're editing it, a banner tells you, and you can load
+  their version. Nothing is ever silently overwritten: if both devices change the same item before they sync, **both
+  versions are kept** (yours is named "… (copy)") and CyberVault tells you.
 - **Offline:** you can still open, view, add, edit and delete items. Changes wait safely on the device and sync by
   themselves when you're back online. The cloud icon and a banner show what's waiting.
-- **Offline clashes:** if an item you changed offline was also changed on another device, both versions are kept.
-  Yours is named "… (offline copy)".
 - **Photos offline:** after you unlock online, photos are saved on the device in the background, so your passport
   photo is there even with no signal.
 - **Needs a connection:** creating a vault, changing the master password or recovery options, making or restoring
@@ -477,7 +478,7 @@ docs/                   screenshots for this README
 - **"You're offline, and this device doesn't have a saved copy of the vault yet"** → connect to the internet and
   unlock once. After that the device works offline.
 - **The cloud icon shows changes waiting** → they sync by themselves when you're online. Tap the icon → **Sync now** to retry.
-- **An item called "… (offline copy)" appeared** → it was changed on two devices before they synced. Keep whichever
+- **An item called "… (copy)" appeared** → it was changed on two devices before they synced. Keep whichever
   version you want and delete the other.
 - **"Text-message codes need Firebase's Blaze plan"** → upgrade the project to Blaze, or use the email reset link instead.
 - **"That number isn't linked to a CyberVault account"** → sign in another way, then add the phone in **Settings → Recovery**.
