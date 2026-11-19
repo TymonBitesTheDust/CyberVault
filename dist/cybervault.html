@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-k/I5c+rSPyotrATdgDQQUg93kczHVkBS/UkpxOKnMj0=' https://www.gstatic.com https://apis.google.com https://www.google.com; style-src 'self' 'unsafe-inline'; font-src data:; img-src 'self' blob: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://www.google.com; frame-src https://*.firebaseapp.com https://*.web.app https://accounts.google.com https://apis.google.com https://www.google.com https://recaptcha.google.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-yjovuinC799Pw8bnf7AhxHQVVrhiK8DL5YcHXDnLBcU=' https://www.gstatic.com https://apis.google.com https://www.google.com; style-src 'self' 'unsafe-inline'; font-src data:; img-src 'self' blob: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://www.google.com; frame-src https://*.firebaseapp.com https://*.web.app https://accounts.google.com https://apis.google.com https://www.google.com https://recaptcha.google.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#050807">
@@ -1356,7 +1356,7 @@ function wifiQrText({ ssid, password = '', security = 'WPA', hidden = false }) {
 return { qrMatrix, qrSvg, wifiQrText };
 })();
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 
 // =====================================================================
 // Item types
@@ -2270,11 +2270,12 @@ window.__cvBack = () => {
 // =====================================================================
 // Data: live sync, offline changes and edit conflicts
 //
-// Every item document carries a random `rev` (not secret) next to its ciphertext. A save
-// only goes through if the server still has the revision the edit started from, so a newer
-// change from another device is never silently overwritten. Offline, changes wait in an
-// "outbox" on this device (ciphertext only) and are sent, with the same check, once the
-// connection is back. Photos are written through Firestore's own offline queue.
+// Every item document carries a random `rev` (not secret) next to its ciphertext. Saves are
+// instant: each change goes into an "outbox" on this device (ciphertext only) and is sent in
+// the background, online or not. Sending only goes through if the server still has the
+// revision the edit started from, so a newer change from another device is never silently
+// overwritten; if both changed, both versions are kept. Photos are written through
+// Firestore's own offline queue.
 // =====================================================================
 
 const BIN_DAYS = 30;
@@ -2371,16 +2372,14 @@ function writeOutbox(list) {
   else localStorage.removeItem(outboxKey());
 }
 
-const pendingIds = () => new Set(readOutbox().map((e) => e.id));
-
 /** Keep a change on this device until it can be sent. One entry per item. */
 function queueChange(entry, item) {
   const list = readOutbox();
   const i = list.findIndex((e) => e.id === entry.id);
   if (i >= 0) {
     const prev = list[i];
-    if (entry.op === 'delete' && prev.base === 'none') {
-      // Created and then deleted while offline: the server never needs to hear about it.
+    if (entry.op === 'delete' && prev.base === 'none' && prev.at !== S.sendingAt) {
+      // Created and then deleted before it was sent: the server never needs to hear about it.
       list.splice(i, 1);
       writeOutbox(list);
       S.local.delete(entry.id);
@@ -2403,8 +2402,10 @@ function queueChange(entry, item) {
 }
 
 function dropFromOutbox(entry) {
-  writeOutbox(readOutbox().filter((e) => !(e.id === entry.id && e.at === entry.at)));
-  S.local.delete(entry.id);
+  const rest = readOutbox().filter((e) => !(e.id === entry.id && e.at === entry.at));
+  writeOutbox(rest);
+  // A newer change to the same item may have been queued while this one was being sent.
+  if (!rest.some((e) => e.id === entry.id)) S.local.delete(entry.id);
 }
 
 /** Decrypt the changes waiting in the outbox, so they show while offline and after a restart. */
@@ -2435,9 +2436,9 @@ function txWrite(id, rec, base, chain = []) {
 }
 
 /**
- * Save an item. Online, it is checked against the server first and throws ConflictError if
- * another device changed it since `base`. Offline, it is kept on this device and synced later.
- * Returns 'saved' or 'queued'.
+ * Save an item. It's saved on this device straight away and sent to Firebase in the background
+ * (or when back online), checked against `base`, the version the edit started from.
+ * Returns 'saved', or 'queued' when offline.
  */
 async function putItem(id, item, { base = baseOf(id), drop = [] } = {}) {
   const key = S.key;
@@ -2446,55 +2447,23 @@ async function putItem(id, item, { base = baseOf(id), drop = [] } = {}) {
   const rec = { ...(await vc.encryptJSON(key, payload, aadItem(id))), rev };
   if (S.key !== key) throw new Error('The vault was locked.');
   S.mine.add(rev);
-  const saved = normalizeItem({ ...payload }, id);
-  if (navigator.onLine && !pendingIds().has(id)) {
-    try {
-      await withTimeout(txWrite(id, rec, base), 12_000);
-      S.superseded.add(`${id}:${base}`);
-      S.server.set(id, saved);
-      S.revs.set(id, rev);
-      rebuildItems();
-      deleteBlobs(drop, id);
-      return 'saved';
-    } catch (e) {
-      if (!isOffline(e)) throw e;
-    }
-  }
-  queueChange({ op: 'set', id, base, rev, rec, drop, at: Date.now() }, saved);
+  queueChange({ op: 'set', id, base, rev, rec, drop, at: Date.now(), offline: !navigator.onLine }, normalizeItem({ ...payload }, id));
   rebuildItems();
-  scheduleFlush();
   updateSyncStatus();
-  return 'queued';
+  scheduleFlush(0);
+  return navigator.onLine ? 'saved' : 'queued';
 }
 
 /** Delete an item for good (from Recently deleted). */
 async function purgeItem(it) {
-  const base = baseOf(it.id);
-  if (navigator.onLine && !pendingIds().has(it.id)) {
-    try {
-      await withTimeout(txWrite(it.id, null, base), 12_000);
-      S.superseded.add(`${it.id}:${base}`);
-      S.server.delete(it.id);
-      S.revs.delete(it.id);
-      rebuildItems();
-      deleteBlobs(it.photos, it.id);
-      return 'deleted';
-    } catch (e) {
-      if (e instanceof ConflictError) {
-        await adoptServer(it.id, e.server);
-        throw e;
-      }
-      if (!isOffline(e)) throw e;
-    }
-  }
-  queueChange({ op: 'delete', id: it.id, base, drop: it.photos, at: Date.now() }, null);
+  queueChange({ op: 'delete', id: it.id, base: baseOf(it.id), drop: it.photos, at: Date.now(), offline: !navigator.onLine }, null);
   rebuildItems();
-  scheduleFlush();
   updateSyncStatus();
-  return 'queued';
+  scheduleFlush(0);
+  return navigator.onLine ? 'deleted' : 'queued';
 }
 
-/** Use the server's version of an item (after a conflict). */
+/** Use the server's version of an item (after a clash). */
 async function adoptServer(id, data) {
   if (!data) {
     S.server.delete(id);
@@ -2506,20 +2475,11 @@ async function adoptServer(id, data) {
   rebuildItems();
 }
 
-/** A small change (favourite, move to bin, restore…) applied on top of the newest version. */
+/** A small change (favourite, move to bin, restore…) applied on top of the newest version here. */
 async function updateItem(id, change) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const cur = S.items.get(id);
-    if (!cur) throw new Error('This item no longer exists.');
-    const next = change(structuredClone(cur));
-    try {
-      return await putItem(id, next);
-    } catch (e) {
-      if (!(e instanceof ConflictError)) throw e;
-      await adoptServer(id, e.server);
-    }
-  }
-  throw new Error('This item keeps changing on another device. Try again in a moment.');
+  const cur = S.items.get(id);
+  if (!cur) throw new Error('This item no longer exists.');
+  return putItem(id, change(structuredClone(cur)));
 }
 
 // ---------- sending the outbox ----------
@@ -2531,22 +2491,28 @@ function scheduleFlush(ms = 1500) {
 }
 
 async function flushOutbox() {
-  if (S.flushing || !S.key || !navigator.onLine || !readOutbox().length) return;
+  if (S.flushing) { S.flushAgain = true; return; }
+  if (!S.key || !navigator.onLine || !readOutbox().length) return;
   const key = S.key;
   S.flushing = true;
+  S.flushAgain = false;
+  S.flushStopped = false;
   updateSyncStatus();
   const notes = [];
+  const clashed = [];
+  let synced = 0;
   try {
-    // Photos saved offline go first, so other devices don't see an item before its photos.
+    // Photos go first, so other devices don't see an item before its photos.
     await withTimeout(waitForPendingWrites(db), 20_000).catch(() => {});
     for (const e of readOutbox()) {
       if (S.key !== key) return;
+      S.sendingAt = e.at;
       try {
         await withTimeout(txWrite(e.id, e.op === 'set' ? e.rec : null, e.base, e.chain), 12_000);
         for (const r of [e.base, ...(e.chain || [])]) S.superseded.add(`${e.id}:${r}`);
+        const newer = readOutbox().some((x) => x.id === e.id && x.at !== e.at);
         if (e.op === 'set') {
-          const it = S.local.get(e.id);
-          if (it) S.server.set(e.id, it);
+          if (!newer && S.local.get(e.id)) S.server.set(e.id, S.local.get(e.id));
           S.revs.set(e.id, e.rec.rev);
         } else {
           S.server.delete(e.id);
@@ -2554,16 +2520,22 @@ async function flushOutbox() {
         }
         dropFromOutbox(e);
         deleteBlobs(e.drop || [], e.id);
+        if (e.offline || Date.now() - e.at > 10_000) synced++;
       } catch (err) {
         if (err instanceof ConflictError) {
+          dropFromOutbox(e); // first, so keeping this device's version starts a fresh entry
+          clashed.push(e.id);
           notes.push(await resolveOfflineConflict(e, err, key));
-          dropFromOutbox(e);
         } else if (isOffline(err)) {
+          S.flushStopped = true;
           break;
         } else {
           toast(`Couldn't sync a change: ${dbMessage(err)}`, 'error');
+          S.flushStopped = true;
           break;
         }
+      } finally {
+        S.sendingAt = 0;
       }
     }
   } finally {
@@ -2572,27 +2544,42 @@ async function flushOutbox() {
     updateSyncStatus();
     refreshView();
   }
+  const r = route();
+  if (r.view === 'item' && clashed.includes(r.arg) && !S.editing) renderDetail(r.arg);
   const msg = notes.filter(Boolean);
-  if (msg.length) infoSheet('Synced, with a clash', msg.join(' '));
-  else if (!readOutbox().length) toast('Offline changes synced');
+  if (msg.length) infoSheet('Changed on two devices', msg.join(' '));
+  else if (synced && !readOutbox().length) toast('Offline changes synced');
+  if (!S.flushStopped && (S.flushAgain || readOutbox().length)) scheduleFlush(100);
 }
 
-/** Another device changed an item that was also changed here while offline: keep both. */
+/** Send everything waiting (for backups and "Sync now"). Gives up after maxMs or when offline. */
+async function syncNow(maxMs = 30_000) {
+  const end = Date.now() + maxMs;
+  while (Date.now() < end && navigator.onLine && S.key && readOutbox().length) {
+    if (S.flushing) await new Promise((r) => setTimeout(r, 150));
+    else {
+      await flushOutbox();
+      if (S.flushStopped) break;
+    }
+  }
+}
+
+/** Another device changed an item that was also changed here before this change reached it: keep both. */
 async function resolveOfflineConflict(e, err, key) {
   await adoptServer(e.id, err.server);
   const theirs = S.server.get(e.id);
   if (e.op === 'delete') {
-    return `“${theirs?.title || 'An item'}” was changed on another device after you deleted it here, so it was kept.`;
+    return `“${theirs?.title || 'An item'}” was changed on another device, so it wasn't deleted.`;
   }
   const mine = normalizeItem(await vc.decryptJSON(key, e.rec, aadItem(e.id)), e.id);
   if (!theirs) {
     // Deleted for good on the other device: put this device's version back.
     await putItem(e.id, mine, { base: 'none' });
-    return `“${mine.title}” was deleted on another device, but you'd changed it here, so your version was kept.`;
+    return `“${mine.title}” had been deleted on another device, but you'd changed it here, so your version was kept.`;
   }
-  const copy = { ...mine, title: `${mine.title} (offline copy)` };
+  const copy = { ...mine, title: `${mine.title} (copy)` };
   await putItem(newId(), copy, { base: 'none' });
-  return `“${theirs.title}” was changed on another device while you were offline. Both versions were kept: yours is “${copy.title}”.`;
+  return `“${theirs.title}” was also changed on another device. Both versions were kept: yours is “${copy.title}”.`;
 }
 
 window.addEventListener('online', () => { updateSyncStatus(); scheduleFlush(500); });
@@ -2821,7 +2808,7 @@ function dropFromCache(photos) {
 
 /**
  * Delete photos' encrypted data, except photos another item still uses
- * (an "offline copy" shares its photos with the original).
+ * (a "(copy)" made when two devices clash shares its photos with the original).
  */
 function deleteBlobs(photos, exceptId) {
   const used = new Set();
@@ -3435,7 +3422,8 @@ function syncButton() {
 
 function syncBanner() {
   const st = syncState();
-  if (!st.offline && !st.pending) return null;
+  const stuck = readOutbox().some((e) => Date.now() - e.at > 8000);
+  if (!st.offline && !(st.pending && stuck)) return null;
   const waiting = st.pending ? ` ${st.pending} change${st.pending > 1 ? 's' : ''} waiting to sync.` : '';
   return h('button', { type: 'button', class: 'banner info', onclick: openSyncSheet },
     icon(st.offline ? 'cloudOff' : 'cloudUp'),
@@ -3463,7 +3451,7 @@ function openSyncSheet() {
           if (!onlineOr()) return;
           close();
           const done = busy('Syncing…');
-          try { await flushOutbox(); } finally { done(); }
+          try { await syncNow(); } finally { done(); }
           if (!readOutbox().length) toast('Up to date');
         },
       })),
@@ -3989,8 +3977,7 @@ async function deleteForever(it) {
     if (route().view === 'item') location.replace('#/bin');
     else refreshView();
   } catch (e) {
-    if (e instanceof ConflictError) toast(`“${it.title}” was just changed on another device, so it wasn't deleted.`, 'error');
-    else toast(e?.code ? dbMessage(e) : e.message, 'error');
+    toast(e?.code ? dbMessage(e) : e.message, 'error');
     refreshView();
   }
 }
@@ -4008,13 +3995,8 @@ function renderBin() {
         confirmLabel: 'Delete forever', danger: true,
       });
       if (!ok) return;
-      const done = busy('Deleting…');
-      let kept = 0;
-      for (const it of items) {
-        try { await purgeItem(it); } catch { kept++; }
-      }
-      done();
-      toast(kept ? `${kept} item(s) were changed on another device and were kept.` : 'Recently deleted is empty');
+      for (const it of items) await purgeItem(it);
+      toast('Recently deleted is empty');
       paint();
     },
   });
@@ -4057,24 +4039,6 @@ function placeholderFor(type, label, kind) {
   const all = [...(TYPES[type]?.fields || []), ...Object.values(TYPES[type]?.presetFields || {}).flat()];
   const tf = all.find(([l]) => l === label);
   return (tf && tf[2]) || KIND_INFO[kind]?.placeholder || '';
-}
-
-/** Ask what to do when the item changed on another device during editing. */
-function conflictSheet(title, deletedThere) {
-  return new Promise((resolve) => {
-    let answer = null;
-    openSheet((close) => [
-      h('div', { class: 'sheet-handle' }),
-      h('h3', { class: 'sheet-title' }, deletedThere ? 'Deleted on another device' : 'Changed on another device'),
-      h('p', { class: 'muted' }, deletedThere
-        ? `“${title}” was deleted on another device while you were editing it here.`
-        : `“${title}” was changed on another device after you started editing it here. Nothing has been overwritten yet.`),
-      h('div', { class: 'stack-sm' },
-        btn(deletedThere ? 'Save mine as a new item' : 'Keep both', { block: true, onClick: () => { answer = 'copy'; close(); } }),
-        deletedThere ? null : btn('Replace theirs with mine', { kind: 'secondary', block: true, onClick: () => { answer = 'mine'; close(); } }),
-        btn('Discard my changes', { kind: 'danger-ghost', block: true, onClick: () => { answer = 'discard'; close(); } })),
-    ], { onClose: () => resolve(answer) });
-  });
 }
 
 function renderEditor(id, typeKey) {
@@ -4252,7 +4216,7 @@ function renderEditor(id, typeKey) {
     const gone = !now || now.deletedAt;
     remoteBanner.replaceChildren(h('div', { class: 'banner warn static' }, icon('alert'),
       h('span', null, h('strong', null, gone ? 'Deleted on another device. ' : 'Changed on another device. '),
-        gone ? 'Saving will ask what to do.' : 'Load their version, or keep editing and choose when you save.'),
+        gone ? 'If you save, your version is kept.' : 'Load their version, or keep editing: if you save, both versions are kept.'),
       gone ? null : btn('Load', {
         kind: 'secondary', small: true,
         onClick: async () => {
@@ -4304,43 +4268,9 @@ function renderEditor(id, typeKey) {
       };
       item.history = nextHistory(S.items.get(itemId) || existing, item, now);
       if (!item.history.length) delete item.history;
-      let result;
-      try {
-        result = await putItem(itemId, item, { base, drop: draft.removed });
-      } catch (e) {
-        if (!(e instanceof ConflictError)) throw e;
-        done();
-        const theirsData = e.server;
-        const choice = await conflictSheet(title, !theirsData);
-        if (!choice) return;
-        if (choice === 'discard') {
-          await adoptServer(itemId, theirsData);
-          dirty = false;
-          if (theirsData) leave(itemId);
-          else { leave(); }
-          return;
-        }
-        const again = busy('Saving…');
-        try {
-          if (choice === 'copy') {
-            const copyId = newId();
-            const copy = { ...item, title: theirsData ? `${title} (copy)` : title, createdAt: now };
-            await adoptServer(itemId, theirsData);
-            result = await putItem(copyId, copy, { base: 'none' });
-            again();
-            dirty = false;
-            toast(theirsData ? 'Saved yours as a copy' : 'Saved as a new item');
-            leave(copyId);
-            return;
-          }
-          // Replace theirs: their password (if it differs) goes into the history.
-          await adoptServer(itemId, theirsData);
-          item.history = nextHistory(S.items.get(itemId), item, now);
-          result = await putItem(itemId, item, { base: baseOf(itemId), drop: draft.removed });
-        } finally {
-          again();
-        }
-      }
+      // `base` is the version this edit started from: if another device changed the item since,
+      // both versions are kept when it syncs.
+      const result = await putItem(itemId, item, { base, drop: draft.removed });
       dirty = false;
       done();
       toast(result === 'queued' ? 'Saved on this device · will sync when online' : 'Saved');
@@ -5315,7 +5245,7 @@ function openExportBackup() {
         }
         setBusy(submit, true, 'Collecting…');
         try {
-          await flushOutbox();
+          await syncNow();
           const { file, missing } = await buildBackup();
           const name = `cybervault-backup-${localDay()}.json`;
           await saveBlob(new Blob([JSON.stringify(file)], { type: 'application/json' }), name);
@@ -5428,12 +5358,7 @@ async function restoreBackup(data, bkey) {
       }
       it.photos = newPhotos;
       delete it.deletedAt;
-      try {
-        await putItem(id, it, { base: 'none' });
-      } catch (e) {
-        if (!(e instanceof ConflictError)) throw e;
-        await putItem(newId(), it, { base: 'none' });
-      }
+      await putItem(id, it, { base: 'none' });
       restored++;
       done(`Restoring ${restored + skipped + broken} / ${ids.length}…`);
     }
