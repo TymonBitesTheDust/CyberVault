@@ -6,3 +6,6 @@ android/*.jks
 android/keystore.properties
 dist/*.apk
 dist/*.idsig
+desktop/assets/*
+!desktop/assets/README.txt
+dist/*.exe

@@ -365,6 +365,29 @@ const settings = (() => {
 const android = typeof window.CyberVaultAndroid === 'object' && window.CyberVaultAndroid ? window.CyberVaultAndroid : null;
 if (android) document.documentElement.classList.add('in-android');
 
+// Inside the CyberVault Windows app (desktop/), the page is marked with
+// <meta name="cybervault-shell" content="windows">, and the app provides window.cvOpenExternal.
+const windowsApp = document.querySelector('meta[name="cybervault-shell"]')?.content === 'windows';
+if (windowsApp) document.documentElement.classList.add('in-windows');
+
+/** Opens a website: in the computer's own browser in the Windows app, a new tab otherwise. */
+function openExternal(href) {
+  if (typeof window.cvOpenExternal === 'function') window.cvOpenExternal(href);
+  else window.open(href, '_blank', 'noopener');
+}
+if (windowsApp) {
+  // Links to websites open in the browser, not inside the app's window.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a[href]');
+    if (!a) return;
+    let url;
+    try { url = new URL(a.href, location.href); } catch { return; }
+    if (url.origin === location.origin || !/^(https?|mailto):$/.test(url.protocol)) return;
+    e.preventDefault();
+    openExternal(url.href);
+  }, true);
+}
+
 function saveSettings() {
   try { localStorage.setItem('vault.settings', JSON.stringify(settings)); } catch { /* private mode */ }
 }
@@ -1858,8 +1881,8 @@ function renderSignIn(message = '') {
     },
   });
   google.prepend(h('span', { class: 'g-mark', 'aria-hidden': 'true' }, 'G'));
-  const googleNote = android ? h('p', { class: 'muted small' },
-    'Google sign-in isn\'t available in the Android app, because Google blocks it inside apps like this. Use email and password, or a text-message code under Can\'t sign in? (Signed up with Google? Use CyberVault in your browser instead.)') : null;
+  const googleNote = android || windowsApp ? h('p', { class: 'muted small' },
+    `Google sign-in isn't available in the ${android ? 'Android' : 'Windows'} app, because Google blocks it inside apps like this. Use email and password, or a text-message code under Can't sign in? (Signed up with Google? Use CyberVault in your browser instead.)`) : null;
 
   const form = h('form', {
     class: 'stack',
@@ -1884,8 +1907,8 @@ function renderSignIn(message = '') {
     h('div', { class: 'term-lines' },
       h('span', null, `firebase project: ${activeConfig.projectId}`),
       h('span', { class: 'ok' }, 'aes-256-gcm on-device · server sees ciphertext only')),
-    android ? googleNote : google,
-    android ? null : h('div', { class: 'divider' }, h('span', null, 'or use email')),
+    android || windowsApp ? googleNote : google,
+    android || windowsApp ? null : h('div', { class: 'divider' }, h('span', null, 'or use email')),
     form,
     h('div', { class: 'auth-links' }, toggleMode, help),
     configSource === 'device' ? h('div', { class: 'auth-links' },
@@ -4214,7 +4237,7 @@ function aboutSection(count) {
       h('img', { class: 'about-logo', src: 'icons/logo.svg', alt: '', width: '60', height: '60' }),
       h('div', null,
         h('div', { class: 'about-name' }, wordmark()),
-        h('div', { class: 'muted small' }, `Version ${APP_VERSION} · ${android ? 'Android app' : installed ? 'Home-screen app' : 'Web app'}`))),
+        h('div', { class: 'muted small' }, `Version ${APP_VERSION} · ${android ? 'Android app' : windowsApp ? 'Windows app' : installed ? 'Installed app' : 'Web app'}`))),
     h('div', { class: 'card about-card' },
       row('user', 'Created by', 'Tymon Ng'),
       row('sparkle', 'Built with', 'Claude AI'),
@@ -4346,9 +4369,9 @@ async function handleUser(user) {
  */
 function registerOffline() {
   if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
-  if (android) {
-    // The Android app already has its files on the phone, and its asset loader can't serve a
-    // service worker's requests. Make sure none is left over.
+  if (android || windowsApp) {
+    // The Android and Windows apps already have their files on the device (and Android's asset
+    // loader can't serve a service worker's requests). Make sure none is left over.
     navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
     return;
   }

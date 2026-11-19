@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-wPmRaR2omdLcRRq+IAMvIhVF/TrOr3WETP+Yq1yqUwI=' https://www.gstatic.com https://apis.google.com https://www.google.com; style-src 'self' 'unsafe-inline'; font-src data:; img-src 'self' blob: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://www.google.com; frame-src https://*.firebaseapp.com https://*.web.app https://accounts.google.com https://apis.google.com https://www.google.com https://recaptcha.google.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-t7xtMdnawLDS9foQU/mk2yPYj1Lx2PMZxSfYFu75lZM=' https://www.gstatic.com https://apis.google.com https://www.google.com; style-src 'self' 'unsafe-inline'; font-src data:; img-src 'self' blob: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://www.google.com; frame-src https://*.firebaseapp.com https://*.web.app https://accounts.google.com https://apis.google.com https://www.google.com https://recaptcha.google.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#050807">
@@ -1705,6 +1705,29 @@ const settings = (() => {
 const android = typeof window.CyberVaultAndroid === 'object' && window.CyberVaultAndroid ? window.CyberVaultAndroid : null;
 if (android) document.documentElement.classList.add('in-android');
 
+// Inside the CyberVault Windows app (desktop/), the page is marked with
+// <meta name="cybervault-shell" content="windows">, and the app provides window.cvOpenExternal.
+const windowsApp = document.querySelector('meta[name="cybervault-shell"]')?.content === 'windows';
+if (windowsApp) document.documentElement.classList.add('in-windows');
+
+/** Opens a website: in the computer's own browser in the Windows app, a new tab otherwise. */
+function openExternal(href) {
+  if (typeof window.cvOpenExternal === 'function') window.cvOpenExternal(href);
+  else window.open(href, '_blank', 'noopener');
+}
+if (windowsApp) {
+  // Links to websites open in the browser, not inside the app's window.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a[href]');
+    if (!a) return;
+    let url;
+    try { url = new URL(a.href, location.href); } catch { return; }
+    if (url.origin === location.origin || !/^(https?|mailto):$/.test(url.protocol)) return;
+    e.preventDefault();
+    openExternal(url.href);
+  }, true);
+}
+
 function saveSettings() {
   try { localStorage.setItem('vault.settings', JSON.stringify(settings)); } catch { /* private mode */ }
 }
@@ -3198,8 +3221,8 @@ function renderSignIn(message = '') {
     },
   });
   google.prepend(h('span', { class: 'g-mark', 'aria-hidden': 'true' }, 'G'));
-  const googleNote = android ? h('p', { class: 'muted small' },
-    'Google sign-in isn\'t available in the Android app, because Google blocks it inside apps like this. Use email and password, or a text-message code under Can\'t sign in? (Signed up with Google? Use CyberVault in your browser instead.)') : null;
+  const googleNote = android || windowsApp ? h('p', { class: 'muted small' },
+    `Google sign-in isn't available in the ${android ? 'Android' : 'Windows'} app, because Google blocks it inside apps like this. Use email and password, or a text-message code under Can't sign in? (Signed up with Google? Use CyberVault in your browser instead.)`) : null;
 
   const form = h('form', {
     class: 'stack',
@@ -3224,8 +3247,8 @@ function renderSignIn(message = '') {
     h('div', { class: 'term-lines' },
       h('span', null, `firebase project: ${activeConfig.projectId}`),
       h('span', { class: 'ok' }, 'aes-256-gcm on-device · server sees ciphertext only')),
-    android ? googleNote : google,
-    android ? null : h('div', { class: 'divider' }, h('span', null, 'or use email')),
+    android || windowsApp ? googleNote : google,
+    android || windowsApp ? null : h('div', { class: 'divider' }, h('span', null, 'or use email')),
     form,
     h('div', { class: 'auth-links' }, toggleMode, help),
     configSource === 'device' ? h('div', { class: 'auth-links' },
@@ -5554,7 +5577,7 @@ function aboutSection(count) {
       h('img', { class: 'about-logo', src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzBmMWYxOSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzAzMDYwNSIvPjwvbGluZWFyR3JhZGllbnQ+CjxmaWx0ZXIgaWQ9Imdsb3ciIHg9Ii0yMCUiIHk9Ii0yMCUiIHdpZHRoPSIxNDAlIiBoZWlnaHQ9IjE0MCUiPjxmZUdhdXNzaWFuQmx1ciBzdGREZXZpYXRpb249IjciIHJlc3VsdD0iYiIvPjxmZU1lcmdlPjxmZU1lcmdlTm9kZSBpbj0iYiIvPjxmZU1lcmdlTm9kZSBpbj0iU291cmNlR3JhcGhpYyIvPjwvZmVNZXJnZT48L2ZpbHRlcj4KPGNsaXBQYXRoIGlkPSJjIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgLz48L2NsaXBQYXRoPgo8L2RlZnM+CjxnIGNsaXAtcGF0aD0idXJsKCNjKSI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI2cpIi8+CjxnIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9Ii4wNyI+PHBhdGggZD0iTTMyIDBWNTEyIiAvPjxwYXRoIGQ9Ik02NCAwVjUxMiIgLz48cGF0aCBkPSJNOTYgMFY1MTIiIC8+PHBhdGggZD0iTTEyOCAwVjUxMiIgLz48cGF0aCBkPSJNMTYwIDBWNTEyIiAvPjxwYXRoIGQ9Ik0xOTIgMFY1MTIiIC8+PHBhdGggZD0iTTIyNCAwVjUxMiIgLz48cGF0aCBkPSJNMjU2IDBWNTEyIiAvPjxwYXRoIGQ9Ik0yODggMFY1MTIiIC8+PHBhdGggZD0iTTMyMCAwVjUxMiIgLz48cGF0aCBkPSJNMzUyIDBWNTEyIiAvPjxwYXRoIGQ9Ik0zODQgMFY1MTIiIC8+PHBhdGggZD0iTTQxNiAwVjUxMiIgLz48cGF0aCBkPSJNNDQ4IDBWNTEyIiAvPjxwYXRoIGQ9Ik00ODAgMFY1MTIiIC8+PHBhdGggZD0iTTAgMzJINTEyIiAvPjxwYXRoIGQ9Ik0wIDY0SDUxMiIgLz48cGF0aCBkPSJNMCA5Nkg1MTIiIC8+PHBhdGggZD0iTTAgMTI4SDUxMiIgLz48cGF0aCBkPSJNMCAxNjBINTEyIiAvPjxwYXRoIGQ9Ik0wIDE5Mkg1MTIiIC8+PHBhdGggZD0iTTAgMjI0SDUxMiIgLz48cGF0aCBkPSJNMCAyNTZINTEyIiAvPjxwYXRoIGQ9Ik0wIDI4OEg1MTIiIC8+PHBhdGggZD0iTTAgMzIwSDUxMiIgLz48cGF0aCBkPSJNMCAzNTJINTEyIiAvPjxwYXRoIGQ9Ik0wIDM4NEg1MTIiIC8+PHBhdGggZD0iTTAgNDE2SDUxMiIgLz48cGF0aCBkPSJNMCA0NDhINTEyIiAvPjxwYXRoIGQ9Ik0wIDQ4MEg1MTIiIC8+PC9nPgo8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjUwOSIgaGVpZ2h0PSI1MDkiIHJ4PSIxMTAuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2RmZmEyIiBzdHJva2Utb3BhY2l0eT0iLjI4IiBzdHJva2Utd2lkdGg9IjMiLz4KPGcgZmlsdGVyPSJ1cmwoI2dsb3cpIj4KPHJlY3QgeD0iODgiIHk9IjE3OCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjUyIiByeD0iOSIgZmlsbD0iIzNkZmZhMiIvPgo8cmVjdCB4PSI4OCIgeT0iMjgyIiB3aWR0aD0iNDAiIGhlaWdodD0iNTIiIHJ4PSI5IiBmaWxsPSIjM2RmZmEyIi8+CjxjaXJjbGUgY3g9IjI2NiIgY3k9IjI1NiIgcj0iMTM4IiBmaWxsPSJyZ2JhKDYxLDI1NSwxNjIsMC4wNykiIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIyOCIvPgo8Y2lyY2xlIGN4PSIyNjYiIGN5PSIyNTYiIHI9IjEwNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2RmZmEyIiBzdHJva2Utd2lkdGg9IjUiIG9wYWNpdHk9Ii4zNSIgc3Ryb2tlLWRhc2hhcnJheT0iMTAgOSIvPgo8bGluZSB4MT0iMjY2LjAiIHkxPSIyMjYuMCIgeDI9IjI2Ni4wIiB5Mj0iMTk2LjAiIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxjaXJjbGUgY3g9IjI2Ni4wIiBjeT0iMTgwLjAiIHI9IjE2IiBmaWxsPSIjMDcxMTBkIiBzdHJva2U9IiMzZGZmYTIiIHN0cm9rZS13aWR0aD0iMTMuNiIvPgo8bGluZSB4MT0iMjk0LjUiIHkxPSIyNDYuNyIgeDI9IjMyMy4xIiB5Mj0iMjM3LjUiIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxjaXJjbGUgY3g9IjMzOC4zIiBjeT0iMjMyLjUiIHI9IjE2IiBmaWxsPSIjMDcxMTBkIiBzdHJva2U9IiMzZGZmYTIiIHN0cm9rZS13aWR0aD0iMTMuNiIvPgo8bGluZSB4MT0iMjgzLjYiIHkxPSIyODAuMyIgeDI9IjMwMS4zIiB5Mj0iMzA0LjUiIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxjaXJjbGUgY3g9IjMxMC43IiBjeT0iMzE3LjUiIHI9IjE2IiBmaWxsPSIjMDcxMTBkIiBzdHJva2U9IiMzZGZmYTIiIHN0cm9rZS13aWR0aD0iMTMuNiIvPgo8bGluZSB4MT0iMjQ4LjQiIHkxPSIyODAuMyIgeDI9IjIzMC43IiB5Mj0iMzA0LjUiIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxjaXJjbGUgY3g9IjIyMS4zIiBjeT0iMzE3LjUiIHI9IjE2IiBmaWxsPSIjMDcxMTBkIiBzdHJva2U9IiMzZGZmYTIiIHN0cm9rZS13aWR0aD0iMTMuNiIvPgo8bGluZSB4MT0iMjM3LjUiIHkxPSIyNDYuNyIgeDI9IjIwOC45IiB5Mj0iMjM3LjUiIHN0cm9rZT0iIzNkZmZhMiIgc3Ryb2tlLXdpZHRoPSIxNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxjaXJjbGUgY3g9IjE5My43IiBjeT0iMjMyLjUiIHI9IjE2IiBmaWxsPSIjMDcxMTBkIiBzdHJva2U9IiMzZGZmYTIiIHN0cm9rZS13aWR0aD0iMTMuNiIvPgo8Y2lyY2xlIGN4PSIyNjYiIGN5PSIyNTYiIHI9IjIzIiBmaWxsPSIjM2RmZmEyIi8+CjwvZz4KPC9nPgo8L3N2Zz4=", alt: '', width: '60', height: '60' }),
       h('div', null,
         h('div', { class: 'about-name' }, wordmark()),
-        h('div', { class: 'muted small' }, `Version ${APP_VERSION} · ${android ? 'Android app' : installed ? 'Home-screen app' : 'Web app'}`))),
+        h('div', { class: 'muted small' }, `Version ${APP_VERSION} · ${android ? 'Android app' : windowsApp ? 'Windows app' : installed ? 'Installed app' : 'Web app'}`))),
     h('div', { class: 'card about-card' },
       row('user', 'Created by', 'Tymon Ng'),
       row('sparkle', 'Built with', 'Claude AI'),
@@ -5686,9 +5709,9 @@ async function handleUser(user) {
  */
 function registerOffline() {
   if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
-  if (android) {
-    // The Android app already has its files on the phone, and its asset loader can't serve a
-    // service worker's requests. Make sure none is left over.
+  if (android || windowsApp) {
+    // The Android and Windows apps already have their files on the device (and Android's asset
+    // loader can't serve a service worker's requests). Make sure none is left over.
     navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
     return;
   }
