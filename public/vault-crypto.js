@@ -134,7 +134,29 @@ export async function createVault(password, { recoveryKey } = {}) {
   if (recoveryKey) meta.recovery = await wrapWith(normalizeRecoveryKey(recoveryKey), raw, RECOVERY_ITERATIONS, RECOVERY_AAD);
   const key = await importDataKey(raw);
   raw.fill(0);
+  meta.keyCheck = await makeKeyCheck(key);
   return { meta, key };
+}
+
+const KEY_CHECK_AAD = 'cybervault:key-check';
+
+/**
+ * A small value encrypted with the vault key and stored with the vault. Changing the master
+ * password keeps it valid; erasing the vault and creating a new one doesn't, which is how a
+ * device that's still unlocked can tell the vault was replaced. Reveals nothing about the key.
+ */
+export async function makeKeyCheck(key) {
+  return encryptJSON(key, { check: 'cybervault' }, KEY_CHECK_AAD);
+}
+
+/** true: the vault still uses this key. false: it was replaced. null: can't tell (no check stored). */
+export async function keyMatches(key, meta) {
+  if (!meta?.keyCheck) return null;
+  try {
+    return (await decryptJSON(key, meta.keyCheck, KEY_CHECK_AAD))?.check === 'cybervault';
+  } catch {
+    return false;
+  }
 }
 
 /** Unlock an existing vault. Throws WrongPasswordError if the password is wrong. */

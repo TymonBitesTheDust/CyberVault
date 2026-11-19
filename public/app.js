@@ -16,7 +16,7 @@ import { firebaseConfig } from './firebase-config.js';
 import * as vc from './vault-crypto.js';
 import { qrSvg, wifiQrText } from './qr.js';
 
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.1.2';
 
 // =====================================================================
 // Item types
@@ -1071,12 +1071,57 @@ function dropFromOutbox(entry) {
 /** Decrypt the changes waiting in the outbox, so they show while offline and after a restart. */
 async function loadLocalChanges(key) {
   S.local = new Map();
+  const foreign = [];
   for (const e of readOutbox()) {
     if (e.op === 'delete') { S.local.set(e.id, null); continue; }
     try {
       S.local.set(e.id, normalizeItem(await vc.decryptJSON(key, e.rec, aadItem(e.id)), e.id));
-    } catch { /* from another vault key: leave it */ }
+    } catch {
+      foreign.push(e); // made in a vault that has since been erased: it can never be opened here
+    }
   }
+  if (foreign.length) writeOutbox(readOutbox().filter((e) => !foreign.some((f) => f.id === e.id && f.at === e.at)));
+}
+
+/**
+ * Before sending changes: is the vault on the server still the one this device unlocked?
+ * It isn't if it was erased (and maybe recreated) on another device. Returns true, or
+ * false after locking with an explanation. Vaults made before 2.1.2 have no key check
+ * until their next online unlock, so for those it can only spot a vault that's gone.
+ */
+async function vaultStillOurs(key) {
+  let snap;
+  try {
+    snap = await withTimeout(getDoc(vaultRef()), 12_000);
+  } catch {
+    return true; // can't tell right now; sending will retry
+  }
+  if (S.key !== key) return false;
+  const meta = snap.exists() ? snap.data() : null;
+  if (meta && (await vc.keyMatches(key, meta)) !== false) {
+    S.meta = meta;
+    return true;
+  }
+  const lost = readOutbox().length;
+  writeOutbox([]); // encrypted with the old vault's key: unusable in a new vault
+  lock();
+  S.meta = meta;
+  infoSheet('Vault was erased', `This vault was erased on another device${meta ? ' and a new one created' : ''}.`
+    + (lost ? ` ${lost} change${lost > 1 ? 's' : ''} made here and not yet synced belonged to the old vault and ${lost > 1 ? 'were' : 'was'} discarded.` : '')
+    + (meta ? ' Unlock with the new vault\'s master password.' : ''));
+  if (!meta) renderCreateVault();
+  return false;
+}
+
+/** Vaults made before 2.1.2 get their key check the next time they're unlocked online. */
+async function ensureKeyCheck(key) {
+  if (S.meta?.keyCheck || !navigator.onLine) return;
+  try {
+    const keyCheck = await vc.makeKeyCheck(key);
+    if (S.key !== key) return;
+    await withTimeout(setDoc(vaultRef(), { keyCheck }, { merge: true }), 15_000);
+    S.meta = { ...S.meta, keyCheck };
+  } catch { /* try again next unlock */ }
 }
 
 /**
@@ -1162,10 +1207,15 @@ async function flushOutbox() {
   const clashed = [];
   let synced = 0;
   try {
+    if (!(await vaultStillOurs(key))) return;
     // Photos go first, so other devices don't see an item before its photos.
     await withTimeout(waitForPendingWrites(db), 20_000).catch(() => {});
-    for (const e of readOutbox()) {
+    for (const queued of readOutbox()) {
       if (S.key !== key) return;
+      // Skip it if, since this round started, it was replaced by a newer change (sent next
+      // round) or cancelled (created and deleted before it was ever sent).
+      const e = readOutbox().find((x) => x.id === queued.id && x.at === queued.at);
+      if (!e) continue;
       S.sendingAt = e.at;
       try {
         await withTimeout(txWrite(e.id, e.op === 'set' ? e.rec : null, e.base, e.chain), 12_000);
@@ -1231,7 +1281,12 @@ async function resolveOfflineConflict(e, err, key) {
   if (e.op === 'delete') {
     return `“${theirs?.title || 'An item'}” was changed on another device, so it wasn't deleted.`;
   }
-  const mine = normalizeItem(await vc.decryptJSON(key, e.rec, aadItem(e.id)), e.id);
+  let mine;
+  try {
+    mine = normalizeItem(await vc.decryptJSON(key, e.rec, aadItem(e.id)), e.id);
+  } catch {
+    return 'A change from this device couldn\'t be opened with this vault\'s key, so it was skipped.';
+  }
   if (!theirs) {
     // Deleted for good on the other device: put this device's version back.
     await putItem(e.id, mine, { base: 'none' });
@@ -1363,7 +1418,7 @@ function syncState() {
 // ---------- after unlocking: sync, tidy up, and keep photos for offline use ----------
 
 function afterUnlock(key) {
-  flushOutbox().catch(() => {}).then(async () => {
+  ensureKeyCheck(key).then(() => flushOutbox()).catch(() => {}).then(async () => {
     if (S.key !== key || !navigator.onLine) return;
     // Recently deleted items are removed for good after 30 days.
     for (const it of binItems()) {
