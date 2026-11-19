@@ -3,8 +3,8 @@
      Built by tools/build-apk.sh (no Gradle needed). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.tymonbitesthedust.cybervault"
-    android:versionCode="20000"
-    android:versionName="2.0.0">
+    android:versionCode="20100"
+    android:versionName="2.1.0">
 
     <!-- Android 7.0+. Targets Android 14. -->
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />

@@ -2,7 +2,7 @@
 <h1 align="center">CyberVault</h1>
 <p align="center"><b>Your personal encrypted vault</b> for logins, ID numbers, cards and document photos.<br>
 Encrypted on your device, synced through your own Firebase project, and usable offline.</p>
-<p align="center"><b>Version 2.0.0</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
+<p align="center"><b>Version 2.1.0</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
 
 <p align="center">
   <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.exe"><b>⬇ Windows app (EXE)</b></a> &nbsp;·&nbsp;
@@ -13,7 +13,11 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 
 <p align="center"><img src="docs/screens.png" width="760" alt="CyberVault: sign-in, vault list with favourites, and a login"></p>
 
-## What's new in 2.0
+## What's new
+
+**2.1:** the **[Windows app](#windows-app)**. One `.exe` for Windows 10 and 11, with no installer and no web hosting needed.
+
+**2.0:**
 
 <p align="center"><img src="docs/whats-new.png" width="900" alt="Wi-Fi QR code, the 'changed on another device' choice, Sync and Backup settings, and the About section"></p>
 
@@ -24,7 +28,7 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 - **New item types:** bank card, bank account (BSB and account number), and **Wi-Fi with a QR code** guests can scan to join.
 - **Better dates.** Medicare and card dates (`MM/YYYY`, `MM/YY`) now get expiry warnings, and dates are checked as you type.
 - **Favourites, recently used and sort options** for the list.
-- **Windows app:** one `.exe`, no installer and no web hosting needed. Plus the Android app.
+- **Android app (APK).**
 - **About** section at the bottom of Settings.
 
 ## Download
