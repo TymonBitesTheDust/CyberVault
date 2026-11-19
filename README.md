@@ -2,7 +2,7 @@
 <h1 align="center">CyberVault</h1>
 <p align="center"><b>Your personal encrypted vault</b> for logins, ID numbers, cards and document photos.<br>
 Encrypted on your device, synced through your own Firebase project, and usable offline.</p>
-<p align="center"><b>Version 2.1.1</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
+<p align="center"><b>Version 2.1.2</b> · Made in Australia by Tymon Ng · Built with Claude AI · <a href="LICENSE">MIT licence</a></p>
 
 <p align="center">
   <a href="https://github.com/TymonBitesTheDust/CyberVault/releases/latest/download/CyberVault.exe"><b>⬇ Windows app (EXE)</b></a> &nbsp;·&nbsp;
@@ -14,6 +14,8 @@ Encrypted on your device, synced through your own Firebase project, and usable o
 <p align="center"><img src="docs/screens.png" width="760" alt="CyberVault: sign-in, vault list with favourites, and a login"></p>
 
 ## What's new
+
+**2.1.2:** two rare sync fixes. An item deleted for good while changes were still sending could come back. And if the vault was erased and a new one created on another device, a device that was still unlocked could send its unsynced changes into the new vault, where they couldn't be opened; it's now told and locked instead.
 
 **2.1.1:** saving, starring, deleting and restoring are instant again: changes no longer wait for the server.
 
