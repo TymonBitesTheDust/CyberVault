@@ -16,7 +16,7 @@ import { firebaseConfig } from './firebase-config.js';
 import * as vc from './vault-crypto.js';
 import { qrSvg, wifiQrText } from './qr.js';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 // =====================================================================
 // Item types
